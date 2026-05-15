@@ -1,0 +1,327 @@
+<!-- frontend/views/dashboard.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>调度概览</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="stylesheet" href="../static/lib/layui/css/layui.css">
+  <link rel="stylesheet" href="../static/css/style.css">
+  <script>
+    // 阻塞式渲染前同步主题，防止白屏闪烁
+    if(localStorage.getItem('theme') === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  </script>
+</head>
+<body>
+<div class="layui-fluid" style="padding: 15px;">
+  <!-- 第一排：KPI 卡片（5列布局） -->
+  <div class="kpi-row">
+    <div class="kpi-col">
+      <div class="layui-card">
+        <div class="layui-card-body kpi-card">
+          <div class="kpi-title">当前储罐液位 (m³)</div>
+          <div class="kpi-value" id="kpi-level">--</div>
+        </div>
+      </div>
+    </div>
+    <div class="kpi-col">
+      <div class="layui-card">
+        <div class="layui-card-body kpi-card">
+          <div class="kpi-title">系统状态</div>
+          <div class="kpi-value" id="kpi-status">--</div>
+        </div>
+      </div>
+    </div>
+    <div class="kpi-col">
+      <div class="layui-card">
+        <div class="layui-card-body kpi-card">
+          <div class="kpi-title">启用车间数</div>
+          <div class="kpi-value" id="kpi-workshops">7</div>
+        </div>
+      </div>
+    </div>
+    <div class="kpi-col">
+      <div class="layui-card">
+        <div class="layui-card-body kpi-card">
+          <div class="kpi-title">总建议排放速率 (m³/h)</div>
+          <div class="kpi-value" id="kpi-total-rate">--</div>
+        </div>
+      </div>
+    </div>
+    <div class="kpi-col">
+      <div class="layui-card">
+        <div class="layui-card-body kpi-card kpi-card-schedule">
+          <div class="kpi-schedule-row">
+            <span class="kpi-schedule-label">当前周期</span>
+            <span class="kpi-schedule-time" id="kpi-current-cycle">--</span>
+          </div>
+          <div class="kpi-schedule-divider"></div>
+          <div class="kpi-schedule-row">
+            <span class="kpi-schedule-label">下期调度</span>
+            <span class="kpi-schedule-time" id="kpi-next-cycle">--</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 第二排：图表 -->
+  <div class="layui-row layui-col-space15">
+    <div class="layui-col-md4">
+      <div class="layui-card">
+        <div class="layui-card-header">储罐液位状态</div>
+        <div class="layui-card-body">
+          <div id="gauge-chart" style="height: 280px; width: 100%;"></div>
+          <div class="gauge-legend">
+            <span class="gauge-legend-item"><i class="gauge-legend-dot" style="background:#10b981;"></i>正常 &lt;80%</span>
+            <span class="gauge-legend-item"><i class="gauge-legend-dot" style="background:#ffb800;"></i>预警 80-90%</span>
+            <span class="gauge-legend-item"><i class="gauge-legend-dot" style="background:#ff5722;"></i>告警 90-95%</span>
+            <span class="gauge-legend-item"><i class="gauge-legend-dot" style="background:#c00000;"></i>紧急 &ge;95%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="layui-col-md8">
+      <div class="layui-card">
+        <div class="layui-card-header">各车间建议排放速率</div>
+        <div class="layui-card-body">
+          <div id="bar-chart" style="height: 300px; width: 100%;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 第三排：表格与告警 -->
+  <div class="layui-row layui-col-space15">
+    <div class="layui-col-md8">
+      <div class="layui-card">
+        <div class="layui-card-header">
+          本周期详细建议方案
+          <a href="javascript:;" id="view-detail-link" style="float: right; font-size: 13px; color: var(--primary-color);"><i class="layui-icon layui-icon-search"></i> 查看详情</a>
+        </div>
+        <div class="layui-card-body">
+          <table id="schedule-table" lay-filter="schedule-table"></table>
+        </div>
+      </div>
+    </div>
+    <div class="layui-col-md4">
+      <div class="layui-card">
+        <div class="layui-card-header">最近10条告警</div>
+        <div class="layui-card-body alert-ticker" id="alert-container">
+          <!-- 动态加载告警信息 -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../static/lib/jquery-1.8.3.min.js"></script>
+<script src="../static/lib/layui/layui.js"></script>
+<script src="../static/lib/echarts.min.js"></script>
+<script src="../static/js/api.js"></script>
+<script src="../static/js/charts.js"></script>
+
+<!-- 详情弹窗模板（与历史查询页面一致） -->
+<script type="text/html" id="detailTpl">
+<div class="detail-wrapper">
+  <!-- 浮动导航菜单 -->
+  <div class="detail-nav" id="detail-nav">
+    <a href="javascript:;" data-target="input-snapshot" class="active">调度快照</a>
+    <a href="javascript:;" data-target="workshop-snapshot">车间快照</a>
+    <a href="javascript:;" data-target="suggestion-section">建议排放</a>
+    <a href="javascript:;" data-target="solver-process">求解过程</a>
+  </div>
+  
+  <div class="detail-section">
+    <!-- 调度输入快照 -->
+    <h4 id="section-input-snapshot"><i class="layui-icon layui-icon-set"></i> 调度输入快照</h4>
+    <div id="input-snapshot"></div>
+    
+    <!-- 调度输入车间快照 -->
+    <h4 id="section-workshop-snapshot"><i class="layui-icon layui-icon-group"></i> 车间配置快照</h4>
+    <div id="workshop-snapshot">
+      <table id="workshop-snapshot-table" lay-filter="workshop-snapshot-table"></table>
+    </div>
+    
+    <!-- 建议排放信息 -->
+    <h4 id="section-suggestion"><i class="layui-icon layui-icon-chart"></i> 建议排放信息</h4>
+    <div id="suggestion-section">
+      <table id="suggestion-table" lay-filter="suggestion-table"></table>
+    </div>
+    
+    <!-- 求解过程演示 -->
+    <h4 id="section-solver"><i class="layui-icon layui-icon-engine"></i> 求解过程</h4>
+    <div id="solver-process"></div>
+  </div>
+</div>
+</script>
+
+<style>
+  /* 详情弹窗样式 */
+  .detail-tabs { margin: 0; }
+  .detail-section { padding: 15px; }
+  .detail-section h4 { 
+    margin-bottom: 10px; 
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e6e6e6;
+    color: #10b981;
+  }
+  [data-theme="dark"] .detail-section h4 {
+    color: #2ADB5C;
+    border-bottom-color: rgba(255,255,255,0.08);
+  }
+  .detail-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 15px;
+  }
+  .detail-item {
+    padding: 8px 12px;
+    background: #f8f8f8;
+    border-radius: 4px;
+  }
+  .detail-item label {
+    display: block;
+    font-size: 12px;
+    color: #999;
+    margin-bottom: 4px;
+  }
+  .detail-item span {
+    font-weight: 500;
+    color: #333;
+  }
+  [data-theme="dark"] .detail-item {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  [data-theme="dark"] .detail-item span {
+    color: #e0e0e0;
+  }
+
+  /* 隐藏弹窗滚动条 */
+  .detail-wrapper {
+    max-height: 520px;
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .detail-wrapper::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 浮动导航菜单 */
+  .detail-nav {
+    position: fixed;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--panel-bg, #fff);
+    border: 1px solid var(--border-color, #e6e6e6);
+    border-radius: 8px;
+    padding: 10px 8px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+    z-index: 1000;
+  }
+  [data-theme="dark"] .detail-nav {
+    background: #25282C;
+    border-color: rgba(255,255,255,0.12);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  }
+  .detail-nav a {
+    display: block;
+    padding: 6px 12px;
+    font-size: 12px;
+    color: var(--text-muted, #666);
+    text-decoration: none;
+    border-radius: 4px;
+    margin-bottom: 4px;
+    transition: all 0.2s ease;
+  }
+  .detail-nav a:last-child { margin-bottom: 0; }
+  .detail-nav a:hover {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+  }
+  [data-theme="dark"] .detail-nav a:hover {
+    background: rgba(42, 219, 92, 0.15);
+    color: #2ADB5C;
+  }
+  .detail-nav a.active {
+    background: #10b981;
+    color: #fff;
+  }
+  [data-theme="dark"] .detail-nav a.active {
+    background: #2ADB5C;
+    color: #000;
+  }
+
+  /* 求解过程模块样式 */
+  .solver-result { margin-top: 10px; }
+  .constraint-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    background: #f8f8f8;
+    border-radius: 4px;
+    margin-bottom: 8px;
+  }
+  [data-theme="dark"] .constraint-item {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .constraint-icon {
+    width: 20px; height: 20px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin-right: 10px; font-size: 12px; font-weight: bold;
+  }
+  .constraint-icon.satisfied {
+    background: rgba(16, 185, 129, 0.2); color: #10b981;
+  }
+  [data-theme="dark"] .constraint-icon.satisfied {
+    background: rgba(42, 219, 92, 0.2); color: #2ADB5C;
+  }
+  .constraint-icon.violated {
+    background: rgba(239, 68, 68, 0.2); color: #ef4444;
+  }
+  [data-theme="dark"] .constraint-icon.violated {
+    background: rgba(255, 82, 82, 0.2); color: #ff5252;
+  }
+  .constraint-label { flex: 1; font-size: 13px; }
+  .constraint-value { font-size: 12px; color: var(--text-muted, #666); }
+  [data-theme="dark"] .constraint-value { color: #8A8F98; }
+
+  /* 表格表头自适应 */
+  .detail-section .layui-table-view { overflow-x: auto; }
+  .detail-section .layui-table th { white-space: nowrap; min-width: fit-content; }
+
+  /* 车间满足状态样式 */
+  .workshop-status-list {
+    margin-top: 8px; padding: 8px;
+    background: rgba(0,0,0,0.02); border-radius: 4px;
+  }
+  [data-theme="dark"] .workshop-status-list {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .workshop-status-item {
+    display: inline-flex; align-items: center;
+    margin: 4px 8px 4px 0; font-size: 12px;
+  }
+  .workshop-status-item .ws-name { margin-right: 6px; color: var(--text-muted, #666); }
+  .workshop-status-item .ws-rate { font-family: monospace; color: #2196f3; }
+  .workshop-status-item .ws-check { margin-left: 4px; color: #10b981; }
+  .workshop-status-item .ws-cross { margin-left: 4px; color: #ef4444; }
+</style>
+<script>
+$(function() {
+    let currentTheme = localStorage.getItem('theme') || 'light';
+    if(currentTheme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+    }
+});
+</script>
+</body>
+</html>

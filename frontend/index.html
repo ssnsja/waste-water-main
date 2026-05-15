@@ -1,0 +1,70 @@
+<!-- frontend/index.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>废水排放调度系统 - 建议层</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="stylesheet" href="static/lib/layui/css/layui.css">
+  <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body class="layui-layout-body">
+<div class="layui-layout layui-layout-admin">
+  <div class="layui-header">
+    <div class="layui-logo layui-hide-xs">废水排放调度系统</div>
+    <!-- 头部区域（可配合layui 已有的水平导航） -->
+    <ul class="layui-nav layui-layout-left">
+      <!-- 移动端显示 -->
+      <li class="layui-nav-item layui-show-xs-inline-block layui-hide-sm" lay-header-event="menuLeft">
+        <i class="layui-icon layui-icon-spread-left"></i>
+      </li>
+    </ul>
+    <div class="custom-header-right" style="float: right; display: flex; align-items: center; height: 60px; padding-right: 20px;">
+      <div class="theme-toggle-btn layui-hide-xs" id="theme-toggle-btn" style="cursor: pointer; display: flex; align-items: center; justify-content: center; height: 32px; padding: 0 16px; margin-right: 20px; border-radius: 16px; border: 1px solid var(--border-color); background-color: var(--panel-bg); color: var(--text-color); transition: all 0.3s; user-select: none;">
+          <i class="layui-icon layui-icon-light" id="theme-icon" style="margin-right: 6px; font-size: 16px;"></i>
+          <span id="theme-label" style="font-size: 14px; line-height: 1;">亮色</span>
+      </div>
+      <div class="system-time-wrapper" style="display: flex; align-items: center; color: var(--header-text); user-select: none; cursor: default;">
+        <i class="layui-icon layui-icon-time" style="margin-right: 6px; font-size: 18px;"></i> 
+        <span id="system-time" style="font-size: 16px;">--:--:--</span>
+      </div>
+    </div>
+  </div>
+  
+  <div class="layui-side">
+    <div class="layui-side-scroll">
+      <!-- 左侧导航区域（可配合layui已有的垂直导航） -->
+      <ul class="layui-nav layui-nav-tree" lay-filter="nav-menu">
+        <li class="layui-nav-item layui-this"><a href="javascript:;" data-url="views/dashboard.html"><i class="layui-icon layui-icon-chart-screen" style="margin-right: 10px; font-size: 16px;"></i>调度概览</a></li>
+        <li class="layui-nav-item"><a href="javascript:;" data-url="views/history.html"><i class="layui-icon layui-icon-log" style="margin-right: 10px; font-size: 16px;"></i>历史查询</a></li>
+        <li class="layui-nav-item"><a href="javascript:;" data-url="views/workshops.html"><i class="layui-icon layui-icon-app" style="margin-right: 10px; font-size: 16px;"></i>车间管理</a></li>
+        <li class="layui-nav-item"><a href="javascript:;" data-url="views/settings.html"><i class="layui-icon layui-icon-set" style="margin-right: 10px; font-size: 16px;"></i>系统配置</a></li>
+      </ul>
+    </div>
+  </div>
+  
+  <div class="layui-body" style="background-color: var(--bg-color); transition: background-color 0.3s;">
+    <!-- 多标签页 -->
+    <div class="layui-tab layui-tab-brief tab-bar" lay-filter="main-tab" style="margin: 0;">
+      <ul class="layui-tab-title">
+        <li class="layui-this" lay-id="dashboard">调度概览</li>
+      </ul>
+      <div class="layui-tab-content">
+        <div class="layui-tab-item layui-show" data-page="dashboard">
+          <iframe class="page-iframe" data-page="dashboard" src="views/dashboard.html" frameborder="0"></iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="layui-footer text-center" style="text-align: center; color: var(--text-muted); font-size: 12px; background-color: var(--panel-bg);">
+    <!-- 底部固定区域 -->
+    © 2026 LiuZuoLin. 版权 所有本系统定位为建议层（Advisory System），输出结果为建议性质，不代替人工决策，不直接控制任何物理设备。
+  </div>
+</div>
+
+<script src="static/lib/jquery-1.8.3.min.js"></script>
+<script src="static/lib/layui/layui.js"></script>
+<script src="static/js/main.js"></script>
+</body>
+</html>

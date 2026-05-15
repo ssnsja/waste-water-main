@@ -1,0 +1,1026 @@
+<!-- frontend/views/history.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>历史查询</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="stylesheet" href="../static/lib/layui/css/layui.css">
+  <link rel="stylesheet" href="../static/css/style.css">
+  <script>
+    // 阻塞式渲染前同步主题，防止白屏闪烁
+    if(localStorage.getItem('theme') === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  </script>
+  <style>
+    /* 详情弹窗样式 */
+    .detail-tabs { margin: 0; }
+    .detail-section { padding: 15px; }
+    .detail-section h4 { 
+      margin-bottom: 10px; 
+      padding-bottom: 8px;
+      border-bottom: 1px solid #e6e6e6;
+      color: #10b981;
+    }
+    /* 暗色模式下模块标题使用主题绿色 */
+    [data-theme="dark"] .detail-section h4 {
+      color: #2ADB5C;
+      border-bottom-color: rgba(255,255,255,0.08);
+    }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    .detail-item {
+      padding: 8px 12px;
+      background: #f8f8f8;
+      border-radius: 4px;
+    }
+    .detail-item label {
+      display: block;
+      font-size: 12px;
+      color: #999;
+      margin-bottom: 4px;
+    }
+    .detail-item span {
+      font-weight: 500;
+      color: #333;
+    }
+    [data-theme="dark"] .detail-item {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    [data-theme="dark"] .detail-item span {
+      color: #e0e0e0;
+    }
+    .alert-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 12px;
+      margin-left: 5px;
+    }
+    .alert-level-2 { background: #ff5722; color: #fff; }
+    .alert-level-3 { background: #f44336; color: #fff; }
+    
+    /* 隐藏弹窗滚动条 */
+    .detail-wrapper {
+      max-height: 520px;
+      overflow-y: auto;
+      scrollbar-width: none; /* Firefox */
+      -ms-overflow-style: none; /* IE/Edge */
+    }
+    .detail-wrapper::-webkit-scrollbar {
+      display: none; /* Chrome/Safari/Opera */
+    }
+    
+    /* 浮动导航菜单 */
+    .detail-nav {
+      position: fixed;
+      right: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: var(--panel-bg, #fff);
+      border: 1px solid var(--border-color, #e6e6e6);
+      border-radius: 8px;
+      padding: 10px 8px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+      z-index: 1000;
+    }
+    [data-theme="dark"] .detail-nav {
+      background: #25282C;
+      border-color: rgba(255,255,255,0.12);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    }
+    .detail-nav a {
+      display: block;
+      padding: 6px 12px;
+      font-size: 12px;
+      color: var(--text-muted, #666);
+      text-decoration: none;
+      border-radius: 4px;
+      margin-bottom: 4px;
+      transition: all 0.2s ease;
+    }
+    .detail-nav a:last-child {
+      margin-bottom: 0;
+    }
+    .detail-nav a:hover {
+      background: rgba(16, 185, 129, 0.1);
+      color: #10b981;
+    }
+    [data-theme="dark"] .detail-nav a:hover {
+      background: rgba(42, 219, 92, 0.15);
+      color: #2ADB5C;
+    }
+    .detail-nav a.active {
+      background: #10b981;
+      color: #fff;
+    }
+    [data-theme="dark"] .detail-nav a.active {
+      background: #2ADB5C;
+      color: #000;
+    }
+    
+    /* 求解过程模块样式 */
+    .solver-result {
+      margin-top: 10px;
+    }
+    .constraint-item {
+      display: flex;
+      align-items: center;
+      padding: 8px 12px;
+      background: #f8f8f8;
+      border-radius: 4px;
+      margin-bottom: 8px;
+    }
+    [data-theme="dark"] .constraint-item {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .constraint-icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 10px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    .constraint-icon.satisfied {
+      background: rgba(16, 185, 129, 0.2);
+      color: #10b981;
+    }
+    [data-theme="dark"] .constraint-icon.satisfied {
+      background: rgba(42, 219, 92, 0.2);
+      color: #2ADB5C;
+    }
+    .constraint-icon.violated {
+      background: rgba(239, 68, 68, 0.2);
+      color: #ef4444;
+    }
+    [data-theme="dark"] .constraint-icon.violated {
+      background: rgba(255, 82, 82, 0.2);
+      color: #ff5252;
+    }
+    .constraint-label {
+      flex: 1;
+      font-size: 13px;
+    }
+    .constraint-value {
+      font-size: 12px;
+      color: var(--text-muted, #666);
+    }
+    [data-theme="dark"] .constraint-value {
+      color: #8A8F98;
+    }
+    
+    /* 表格表头自适应 */
+    .detail-section .layui-table-view {
+      overflow-x: auto;
+    }
+    .detail-section .layui-table th {
+      white-space: nowrap;
+      min-width: fit-content;
+    }
+    
+    /* 自定义悬浮提示样式 */
+    .custom-tooltip {
+      position: fixed;
+      background: #333;
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      max-width: 300px;
+      z-index: 9999;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      line-height: 1.5;
+    }
+    .custom-tooltip.show {
+      opacity: 1;
+    }
+    [data-theme="dark"] .custom-tooltip {
+      background: #fff;
+      color: #333;
+    }
+    
+    /* 车间满足状态样式 */
+    .workshop-status-list {
+      margin-top: 8px;
+      padding: 8px;
+      background: rgba(0,0,0,0.02);
+      border-radius: 4px;
+    }
+    [data-theme="dark"] .workshop-status-list {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .workshop-status-item {
+      display: inline-flex;
+      align-items: center;
+      margin: 4px 8px 4px 0;
+      font-size: 12px;
+    }
+    .workshop-status-item .ws-name {
+      margin-right: 6px;
+      color: var(--text-muted, #666);
+    }
+    .workshop-status-item .ws-rate {
+      font-family: monospace;
+      color: #2196f3;
+    }
+    .workshop-status-item .ws-check {
+      margin-left: 4px;
+      color: #10b981;
+    }
+    .workshop-status-item .ws-cross {
+      margin-left: 4px;
+      color: #ef4444;
+    }
+  </style>
+</head>
+<body>
+<div class="layui-fluid" style="padding: 15px;">
+  <!-- 查询条件区 -->
+  <div class="layui-card">
+    <div class="layui-card-body">
+      <form class="layui-form layui-row layui-col-space10">
+        <div class="layui-col-md4">
+          <label class="layui-form-label">时间范围</label>
+          <div class="layui-input-block">
+            <input type="text" class="layui-input" id="date-range" placeholder=" - " autocomplete="off">
+          </div>
+        </div>
+        <div class="layui-col-md4">
+          <label class="layui-form-label">状态筛选</label>
+          <div class="layui-input-block">
+            <select name="status">
+              <option value="">全部状态</option>
+              <option value="NORMAL">正常</option>
+              <option value="WARNING">预警</option>
+              <option value="ALERT">告警</option>
+              <option value="EMERGENCY">紧急</option>
+            </select>
+          </div>
+        </div>
+        <div class="layui-col-md4">
+          <button class="layui-btn layui-btn-primary" lay-submit lay-filter="search">
+            <i class="layui-icon layui-icon-search"></i> 查询
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 历史趋势图 -->
+  <div class="layui-card">
+    <div class="layui-card-header">历史趋势与预测</div>
+    <div class="layui-card-body">
+      <div id="history-chart" style="height: 350px; width: 100%;"></div>
+    </div>
+  </div>
+
+  <!-- 历史记录表格 -->
+  <div class="layui-card">
+    <div class="layui-card-header">历史调度记录</div>
+    <div class="layui-card-body">
+      <table id="history-table" lay-filter="history-table"></table>
+    </div>
+  </div>
+</div>
+
+<!-- 操作列模板 -->
+<script type="text/html" id="operTpl">
+  <button class="layui-btn layui-btn-xs layui-btn-normal" lay-event="detail">
+    <i class="layui-icon layui-icon-search"></i> 详情
+  </button>
+</script>
+
+<!-- 状态模板 -->
+<script type="text/html" id="statusTpl">
+  <span class="status-badge 
+    {{# if(d.status === 'NORMAL'){ }} badge-soft-green {{# } }}
+    {{# if(d.status === 'WARNING'){ }} badge-soft-yellow {{# } }}
+    {{# if(d.status === 'ALERT'){ }} badge-soft-red {{# } }}
+    {{# if(d.status === 'EMERGENCY'){ }} badge-soft-dark {{# } }}
+  ">{{ d.status }}</span>
+</script>
+
+<!-- 详情弹窗模板 -->
+<script type="text/html" id="detailTpl">
+<div class="detail-wrapper">
+  <!-- 浮动导航菜单 -->
+  <div class="detail-nav" id="detail-nav">
+    <a href="javascript:;" data-target="input-snapshot" class="active">调度快照</a>
+    <a href="javascript:;" data-target="workshop-snapshot">车间快照</a>
+    <a href="javascript:;" data-target="suggestion-section">建议排放</a>
+    <a href="javascript:;" data-target="solver-process">求解过程</a>
+  </div>
+  
+  <div class="detail-section">
+    <!-- 调度输入快照 -->
+    <h4 id="section-input-snapshot"><i class="layui-icon layui-icon-set"></i> 调度输入快照</h4>
+    <div id="input-snapshot"></div>
+    
+    <!-- 调度输入车间快照 -->
+    <h4 id="section-workshop-snapshot"><i class="layui-icon layui-icon-group"></i> 车间配置快照</h4>
+    <div id="workshop-snapshot">
+      <table id="workshop-snapshot-table" lay-filter="workshop-snapshot-table"></table>
+    </div>
+    
+    <!-- 建议排放信息 -->
+    <h4 id="section-suggestion"><i class="layui-icon layui-icon-chart"></i> 建议排放信息</h4>
+    <div id="suggestion-section">
+      <table id="suggestion-table" lay-filter="suggestion-table"></table>
+    </div>
+    
+    <!-- 求解过程演示 -->
+    <h4 id="section-solver"><i class="layui-icon layui-icon-engine"></i> 求解过程</h4>
+    <div id="solver-process"></div>
+  </div>
+</div>
+</script>
+
+<script src="../static/lib/jquery-1.8.3.min.js"></script>
+<script src="../static/lib/layui/layui.js"></script>
+<script src="../static/lib/echarts.min.js"></script>
+<script src="../static/js/api.js"></script>
+<script src="../static/js/charts.js"></script>
+<script>
+$(function() {
+    // 渲染日期组件
+    layui.use(['laydate', 'form', 'table', 'layer'], function(){
+        var laydate = layui.laydate;
+        var table = layui.table;
+        var layer = layui.layer;
+        var form = layui.form;
+        
+        laydate.render({
+            elem: '#date-range',
+            type: 'datetime',
+            format: 'yyyy-MM-dd HH:mm',
+            range: true,
+            theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'molv' : 'default',
+            ready: function(date){
+                var timer = setInterval(function() {
+                    var $timeTitle = $('.laydate-time-text');
+                    if($timeTitle.length > 0) {
+                        $timeTitle.text('时间选择');
+                        $('.laydate-time-list li:nth-child(3)').hide(); 
+                        $('.layui-laydate-content .laydate-time-list > li').css('width', '50%');
+                    }
+                }, 50);
+                setTimeout(function(){ clearInterval(timer); }, 1000);
+            }
+        });
+        
+        // 从 API 加载历史调度记录
+        var histCurrentPage = 1;
+        var histPageSize = 10;
+
+        function loadHistoryRecords(params) {
+            params = params || {};
+            if (!params.page) params.page = histCurrentPage;
+            if (!params.page_size) params.page_size = histPageSize;
+
+            window.API.getHistoryRecords(params).done(function(resp) {
+                if (resp.status !== 200) {
+                    layer.msg('查询历史记录失败: ' + resp.message);
+                    return;
+                }
+                var data = resp.data;
+                histCurrentPage = data.page;
+                var tableData = data.records || [];
+                table.render({
+                    elem: '#history-table',
+                    data: tableData,
+                    page: {
+                        count: data.total,
+                        limit: data.page_size,
+                        curr: data.page
+                    },
+                    limit: data.page_size,
+                    cols: [[
+                        {field: 'schedule_time', title: '调度时间', width: 180, templet: function(d){ return formatAPITime(d.schedule_time); }},
+                        {field: 'schedule_id', title: '调度批次号', hide: true},
+                        {field: 'zone', title: '液位区间', width: 100, templet: function(d){
+                            var zoneText = d.zone === 'NORMAL' ? '正常' : 
+                                           d.zone === 'WARNING' ? '预警' : 
+                                           d.zone === 'ALERT' ? '告警' : 
+                                           d.zone === 'EMERGENCY' ? '紧急' : d.zone;
+                            var colorCls = d.zone === 'NORMAL' ? 'badge-soft-green' : 
+                                           d.zone === 'WARNING' ? 'badge-soft-yellow' : 
+                                           d.zone === 'ALERT' ? 'badge-soft-red' : 
+                                           d.zone === 'EMERGENCY' ? 'badge-soft-dark' : 'badge-soft-gray';
+                            return '<span class="status-badge ' + colorCls + '">' + zoneText + '</span>';
+                        }},
+                        {field: 'tank_level', title: '调度时液位(m³)', width: 130, align: 'right'},
+                        {field: 'level_ratio', title: '液位占比', width: 100, align: 'right', templet: function(d){
+                            return (d.level_ratio * 100).toFixed(1) + '%';
+                        }},
+                        {field: 'workshop_count', title: '调度车间数', width: 100, align: 'center'},
+                        {field: 'solver_status', title: '求解状态', width: 100, templet: function(d){
+                            var statusText = d.solver_status === 'Optimal' ? '最优解' : 
+                                             d.solver_status === 'Infeasible' ? '无解' : 
+                                             d.solver_status === 'Timeout' ? '超时' : 
+                                             d.solver_status === 'SKIPPED' ? '已跳过' : d.solver_status;
+                            var cls = d.solver_status === 'Optimal' ? 'badge-soft-green' : 'badge-soft-red';
+                            return '<span class="status-badge ' + cls + '">' + statusText + '</span>';
+                        }},
+                        {field: 'alert_info', title: '告警记录', minWidth: 200, templet: function(d){
+                            if (!d.alert_info) {
+                                return '<span style="color: #999;">-</span>';
+                            }
+                            var levelClass = d.alert_info.alert_level === 3 ? 'badge-soft-dark' : 'badge-soft-red';
+                            var levelText = d.alert_info.alert_level === 3 ? '紧急' : '告警';
+                            var msg = d.alert_info.alert_message || '';
+                            var shortMsg = msg.length > 15 ? msg.substring(0, 15) + '...' : msg;
+                            return '<span class="status-badge ' + levelClass + '">' + levelText + '</span> ' +
+                                   '<span class="alert-msg-hover" data-fullmsg="' + msg + '" style="cursor: pointer; color: var(--text-muted, #666);">' + shortMsg + '</span>';
+                        }},
+                        {title: '操作', width: 100, align: 'center', toolbar: '#operTpl'}
+                    ]],
+                });
+            }).fail(function() {
+                layer.msg('查询历史记录失败，请检查网络连接');
+            });
+        }
+
+        // 初始加载
+        loadHistoryRecords();
+
+        // 分页切换
+        table.on('page(history-table)', function(obj) {
+            histCurrentPage = obj.curr;
+            loadHistoryRecords({page: obj.curr, page_size: obj.limit});
+        });
+        
+        // 监听表格行点击 - 只高亮行，不弹窗
+        table.on('row(history-table)', function(obj){
+            // 高亮当前行
+            obj.tr.addClass('layui-table-click').siblings().removeClass('layui-table-click');
+        });
+        
+        // 监听表格工具条（详情按钮点击）
+        table.on('tool(history-table)', function(obj){
+            var data = obj.data;
+            if(obj.event === 'detail'){
+                showDetail(data, table, layer);
+            }
+        });
+        
+        // 搜索表单提交
+        form.on('submit(search)', function(data){
+            var formData = data.field;
+            var params = { page: 1, page_size: histPageSize };
+            var trendParams = {};
+            
+            // 处理时间范围
+            var dateRange = $('#date-range').val();
+            if (dateRange) {
+                var parts = dateRange.split(' - ');
+                if (parts.length === 2) {
+                    params.start_time = parts[0].replace(' ', 'T') + ':00';
+                    params.end_time = parts[1].replace(' ', 'T') + ':59';
+                    trendParams.start_time = params.start_time;
+                    trendParams.end_time = params.end_time;
+                }
+            }
+            
+            // 处理状态筛选
+            if (formData.status) {
+                params.zone = formData.status;
+            }
+            
+            loadHistoryRecords(params);
+            // 同步更新趋势图
+            if (typeof loadTrendData === 'function') {
+                loadTrendData(trendParams);
+            }
+            return false;
+        });
+    });
+
+    // 显示详情弹窗
+    function showDetail(record, table, layer) {
+        // 从 API 获取详情数据
+        window.API.getScheduleDetail(record.schedule_id).done(function(resp) {
+            if (resp.status !== 200) {
+                layer.msg('获取调度详情失败: ' + resp.message);
+                return;
+            }
+            var detailData = resp.data;
+
+            // 使用后端数据 + 前端模板渲染求解过程
+            var solverProcess = buildSolverProcessFromSnapshot(
+                detailData.input_snapshot,
+                detailData.suggestions
+            );
+            detailData.solver_process = solverProcess;
+        
+            layer.open({
+                type: 1,
+                title: '调度详情 - ' + record.schedule_time,
+                area: ['900px', '600px'],
+                maxWidth: 900,
+                content: $('#detailTpl').html(),
+                success: function(layero, index) {
+                    // 渲染调度输入快照
+                    renderInputSnapshot(detailData.input_snapshot);
+                    
+                    // 渲染车间配置快照表格
+                    table.render({
+                        elem: '#workshop-snapshot-table',
+                        data: detailData.workshop_snapshots || [],
+                        page: false,
+                        limit: 10,
+                        cols: [[
+                            {field: 'workshop_id', title: '车间编号', minWidth: 80},
+                            {field: 'workshop_name', title: '车间名称', minWidth: 100},
+                            {field: 'max_discharge_rate', title: '最大速率(m³/h)', minWidth: 120, align: 'right'},
+                            {field: 'min_discharge_rate', title: '最小速率(m³/h)', minWidth: 120, align: 'right'},
+                            {field: 'priority_weight', title: '优先级权重', minWidth: 100, align: 'center'},
+                            {field: 'elastic_max_rate', title: '弹性上限(m³/h)', minWidth: 130, align: 'right', templet: function(d){
+                                return d.elastic_max_rate || '-';
+                            }}
+                        ]]
+                    });
+                    
+                    // 渲染建议排放表格
+                    table.render({
+                        elem: '#suggestion-table',
+                        data: detailData.suggestions || [],
+                        page: false,
+                        limit: 10,
+                        cols: [[
+                            {field: 'workshop_id', title: '车间编号', minWidth: 80},
+                            {field: 'workshop_name', title: '车间名称', minWidth: 100},
+                            {field: 'allowed_rate', title: '建议速率(m³/h)', minWidth: 130, align: 'right'},
+                            {field: 'allowed_volume', title: '建议排放量(m³)', minWidth: 140, align: 'right'},
+                            {field: 'schedule_status', title: '调度状态', minWidth: 100, templet: function(d){
+                                var statusText = d.schedule_status === 'NORMAL' ? '正常' : 
+                                               d.schedule_status === 'WARNING' ? '预警' : 
+                                               d.schedule_status === 'ALERT' ? '告警' : 
+                                               d.schedule_status === 'EMERGENCY' ? '紧急' : d.schedule_status;
+                                var colorCls = d.schedule_status === 'NORMAL' ? 'badge-soft-green' : 
+                                               d.schedule_status === 'WARNING' ? 'badge-soft-yellow' : 
+                                               d.schedule_status === 'ALERT' ? 'badge-soft-red' : 
+                                               d.schedule_status === 'EMERGENCY' ? 'badge-soft-dark' : 'badge-soft-gray';
+                                return '<span class="status-badge ' + colorCls + '">' + statusText + '</span>';
+                            }}
+                        ]]
+                    });
+                    
+                    // 渲染求解过程
+                    renderSolverProcess(detailData.solver_process, detailData.input_snapshot);
+                    
+                    // 初始化浮动导航交互
+                    initDetailNav();
+                }
+            });
+        }).fail(function() {
+            layer.msg('获取调度详情失败，请检查网络连接');
+        });
+    }
+
+    // 渲染调度输入快照
+    function renderInputSnapshot(snapshot) {
+        var zoneText = snapshot.zone === 'NORMAL' ? '正常' : 
+                       snapshot.zone === 'WARNING' ? '预警' : 
+                       snapshot.zone === 'ALERT' ? '告警' : 
+                       snapshot.zone === 'EMERGENCY' ? '紧急' : snapshot.zone;
+        var html = '<div class="detail-grid">' +
+            '<div class="detail-item"><label>储罐容量</label><span>' + snapshot.tank_capacity + ' m³</span></div>' +
+            '<div class="detail-item"><label>处理能力</label><span>' + snapshot.process_capacity + ' m³/h</span></div>' +
+            '<div class="detail-item"><label>调度周期</label><span>' + snapshot.schedule_interval_min + ' 分钟</span></div>' +
+            '<div class="detail-item"><label>安全容量系数</label><span>' + snapshot.safe_ratio + '</span></div>' +
+            '<div class="detail-item"><label>预警阈值</label><span>' + snapshot.warning_ratio + '</span></div>' +
+            '<div class="detail-item"><label>告警阈值</label><span>' + snapshot.alert_ratio + '</span></div>' +
+            '<div class="detail-item"><label>紧急阈值</label><span>' + snapshot.emergency_ratio + '</span></div>' +
+            '<div class="detail-item"><label>调度时液位</label><span>' + parseFloat(snapshot.tank_level).toFixed(2) + ' m³</span></div>' +
+            '<div class="detail-item"><label>液位占比</label><span>' + (parseFloat(snapshot.level_ratio) * 100).toFixed(1) + '%</span></div>' +
+            '<div class="detail-item"><label>液位区间</label><span>' + zoneText + '</span></div>' +
+            '<div class="detail-item"><label>弹性系数k</label><span>' + (snapshot.elastic_k ? parseFloat(snapshot.elastic_k).toFixed(4) : '-') + '</span></div>' +
+            '<div class="detail-item"><label>容量约束上限</label><span>' + (snapshot.capacity_limit ? parseFloat(snapshot.capacity_limit).toFixed(2) : '-') + ' m³/h</span></div>' +
+            '<div class="detail-item"><label>处理能力约束</label><span>' + (snapshot.process_limit ? parseFloat(snapshot.process_limit).toFixed(2) : '-') + ' m³/h</span></div>' +
+            '<div class="detail-item"><label>生效约束上限</label><span>' + (snapshot.effective_limit ? parseFloat(snapshot.effective_limit).toFixed(2) : '-') + ' m³/h</span></div>' +
+            '<div class="detail-item"><label>启用车间数</label><span>' + snapshot.workshop_count + '</span></div>' +
+        '</div>';
+        $('#input-snapshot').html(html);
+    }
+    
+    // 渲染求解过程
+    function renderSolverProcess(solverProcess, snapshot) {
+        if (!solverProcess) {
+            $('#solver-process').html('<div class="layui-text" style="color: #999; padding: 10px;">求解过程数据不可用</div>');
+            return;
+        }
+        
+        var html = '<div class="solver-result">';
+        
+        // 求解状态
+        html += '<div style="margin-bottom: 15px; font-size: 13px; color: var(--text-muted, #666);">';
+        html += '<strong>求解状态：</strong>' + (solverProcess.status === 'Optimal' ? '最优解' : solverProcess.status === 'SKIPPED' ? '已跳过（告警/紧急区间）' : solverProcess.status);
+        html += '</div>';
+        
+        // 约束条件列表（按PRD 4.3节顺序）
+        html += '<div class="constraint-list">';
+        solverProcess.constraints.forEach(function(c) {
+            var iconClass = c.satisfied ? 'satisfied' : 'violated';
+            var iconText = c.satisfied ? '✓' : '✗';
+            html += '<div class="constraint-item" style="flex-wrap: wrap; margin-bottom: 12px;">';
+            html += '<div style="display: flex; align-items: center; width: 100%;">';
+            html += '<div class="constraint-icon ' + iconClass + '">' + iconText + '</div>';
+            html += '<div class="constraint-label"><strong>' + c.order + '：' + c.name + '</strong></div>';
+            html += '<div class="constraint-value">' + c.value + '</div>';
+            html += '</div>';
+            
+            // 公式说明
+            html += '<div style="width: 100%; margin-top: 8px; padding: 8px 12px 8px 30px; font-size: 12px; background: rgba(16, 185, 129, 0.03); border-radius: 4px;">';
+            
+            // 原始公式
+            html += '<div style="color: #10b981; margin-bottom: 4px;"><i class="layui-icon layui-icon-log" style="margin-right: 4px;"></i>公式：' + c.formula + '</div>';
+            
+            // 公式符号说明
+            if (c.formulaExplain) {
+                html += '<div style="color: var(--text-muted, #888); margin-left: 16px;">' + c.formulaExplain + '</div>';
+            }
+            
+            // 等价形式（容量约束特有）
+            if (c.equivalent) {
+                html += '<div style="color: #ff9800; margin-left: 16px; margin-top: 4px;">' + c.equivalent + '</div>';
+            }
+            
+            // 实际数据计算
+            if (c.calcVars) {
+                html += '<div style="color: #2196f3; margin-left: 16px; margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.1);">';
+                if (c.name === '储罐容量约束') {
+                    var V = c.calcVars.V;
+                    var SAFE_RATIO = c.calcVars.SAFE_RATIO;
+                    var L = c.calcVars.L;
+                    var T = c.calcVars.T;
+                    var C = c.calcVars.C;
+                    var V_SAFE = V * SAFE_RATIO;
+                    var V_SAFE_minus_L = V_SAFE - L;
+                    var divide_T = V_SAFE_minus_L / T;
+                    
+                    html += '→ 分步计算：<br/>';
+                    html += '<div style="margin-left: 16px; line-height: 1.8;">';
+                    html += '① V × SAFE_RATIO = ' + V + ' × ' + SAFE_RATIO + ' = ' + V_SAFE.toFixed(2) + ' m³（安全容量上限）<br/>';
+                    html += '② V × SAFE_RATIO - L = ' + V_SAFE.toFixed(2) + ' - ' + L + ' = ' + V_SAFE_minus_L.toFixed(2) + ' m³（可增量空间）<br/>';
+                    html += '③ (V × SAFE_RATIO - L) / T = ' + V_SAFE_minus_L.toFixed(2) + ' / ' + T + ' = ' + divide_T.toFixed(2) + ' m³/h（速率上限）<br/>';
+                    html += '④ Σr_i ≤ ' + divide_T.toFixed(2) + ' + ' + C + ' = <b style="color: #10b981;">' + c.calcVars.capacityLimit + ' m³/h</b>';
+                    html += '</div>';
+                    html += '</div>';
+                    
+                    // 约束满足验证（代入求解结果校验等价公式）
+                    if (c.riCalc && c.riCalc.actualSum !== undefined) {
+                        html += '<div style="margin-top: 10px; padding: 10px; background: rgba(33, 150, 243, 0.08); border-radius: 4px;">';
+                        html += '<div style="font-size: 11px; color: #2196f3; margin-bottom: 8px;"><i class="layui-icon layui-icon-engine" style="margin-right: 4px;"></i>约束满足验证（代入求解结果校验等价公式）：</div>';
+                        html += '<div style="font-size: 12px; color: #ff9800; margin-bottom: 6px;">验证等价公式：Σr_i ≤ (V × SAFE_RATIO - L) / T + C</div>';
+                        html += '<div style="font-size: 12px; line-height: 1.8;">';
+                        // 左侧：各车间建议速率之和
+                        html += '<div style="color: var(--text-muted, #888); margin-bottom: 2px;">① 左侧 Σr_i = 各车间建议速率之和：</div>';
+                        html += '<div style="margin-left: 16px;">';
+                        c.riCalc.workshops.forEach(function(ws) {
+                            html += '<span style="display: inline-block; margin-right: 12px; margin-bottom: 2px;">' + ws.name + ': <span style="font-family: monospace; color: #2196f3;">' + ws.rate + '</span></span>';
+                        });
+                        html += '<br/>';
+                        var wsRates = c.riCalc.workshops.map(function(ws) { return ws.rate; });
+                        html += 'Σr_i = ' + wsRates.join(' + ') + ' = <b style="color: #2196f3;">' + c.riCalc.actualSum + '</b> m³/h';
+                        html += '</div>';
+                        // 右侧：约束上限
+                        html += '<div style="color: var(--text-muted, #888); margin-top: 6px; margin-bottom: 2px;">② 右侧约束上限（已在上方分步计算）= <b style="color: #10b981;">' + c.riCalc.constraintLimit + '</b> m³/h</div>';
+                        // 比较验证
+                        html += '<div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.1);">';
+                        html += '<div style="color: var(--text-muted, #888); margin-bottom: 4px;">③ 比较验证：</div>';
+                        var satisfied = c.riCalc.satisfied;
+                        var compareColor = satisfied ? '#10b981' : '#ef4444';
+                        html += '<div style="margin-left: 16px;">';
+                        html += c.riCalc.actualSum + ' ≤ ' + c.riCalc.constraintLimit + ' → <b style="color: ' + compareColor + ';">' + (satisfied ? '✓ 满足约束' : '✗ 违反约束') + '</b>';
+                        html += '</div>';
+                        html += '</div>';
+                        html += '</div>';
+                        html += '</div>';
+                    }
+                } else if (c.name === '处理能力约束') {
+                    html += '→ 计算：C × PROCESS_BUFFER_RATIO = ' + c.calcVars.C + ' × ' + c.calcVars.PROCESS_BUFFER_RATIO + ' = ' + (c.calcVars.C * c.calcVars.PROCESS_BUFFER_RATIO) + ' m³/h';
+                } else if (c.name === '单车间速率上限约束') {
+                    var k = c.calcVars.k;
+                    var rMax = c.calcVars.r_max;
+                    html += '→ 计算：r_max × k = ' + rMax + ' × ' + k + ' = ' + (rMax * parseFloat(k)).toFixed(2) + ' m³/h';
+                } else if (c.name === '单车间最小速率约束') {
+                    html += '→ r_min = ' + c.calcVars.r_min + ' m³/h';
+                }
+                html += '</div>';
+            }
+            
+            // 车间满足状态列表
+            if (c.workshopStatus) {
+                html += '<div class="workshop-status-list">';
+                html += '<div style="font-size: 11px; color: var(--text-muted, #888); margin-bottom: 4px;">各车间满足情况：</div>';
+                c.workshopStatus.forEach(function(ws) {
+                    html += '<span class="workshop-status-item">';
+                    html += '<span class="ws-name">' + ws.name + '</span>';
+                    html += '<span class="ws-rate">' + ws.allowed_rate + '</span>';
+                    html += '<span class="' + (ws.satisfied ? 'ws-check' : 'ws-cross') + '">' + (ws.satisfied ? '✓' : '✗') + '</span>';
+                    html += '</span>';
+                });
+                html += '</div>';
+            }
+            
+            html += '</div>';
+            html += '</div>';
+        });
+        html += '</div>';
+        
+        // 弹性系数说明（所有区间都显示）
+        if (solverProcess.elasticFormula) {
+            var ef = solverProcess.elasticFormula;
+            var zoneColor = ef.zone === 'WARNING' ? '#ff9800' : (ef.zone === 'NORMAL' ? '#10b981' : '#ef4444');
+            var zoneBgColor = ef.zone === 'WARNING' ? 'rgba(255, 152, 0, 0.1)' : (ef.zone === 'NORMAL' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)');
+            var zoneTitle = ef.zone === 'WARNING' ? '弹性系数计算（预警区间）' : (ef.zone === 'NORMAL' ? '弹性系数（正常区间）' : '弹性系数（' + (ef.zone === 'ALERT' ? '告警' : '紧急') + '区间）');
+            html += '<div style="margin-top: 15px; padding: 10px 12px; background: ' + zoneBgColor + '; border-radius: 4px; border-left: 3px solid ' + zoneColor + ';">';
+            html += '<div style="font-weight: bold; color: ' + zoneColor + '; margin-bottom: 8px;"><i class="layui-icon layui-icon-rate" style="margin-right: 4px;"></i>' + zoneTitle + '</div>';
+            html += '<div style="font-size: 12px; color: var(--text-muted, #888);">';
+            if (ef.zone === 'WARNING') {
+                html += '<div style="color: #10b981;">公式：' + ef.formula + '</div>';
+                html += '<div style="margin-left: 16px;">' + ef.formulaExplain + '</div>';
+                html += '<div style="color: #2196f3; margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.1);">→ 计算：' + ef.calcProcess + '</div>';
+            } else {
+                html += '<div style="color: #10b981;">公式：' + ef.formula + '</div>';
+                html += '<div style="margin-left: 16px;">' + ef.formulaExplain + '</div>';
+                html += '<div style="color: ' + zoneColor + '; margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.1);">→ ' + ef.calcProcess + '</div>';
+            }
+            html += '</div></div>';
+        }
+        
+        // 优化目标
+        if (solverProcess.objective) {
+            var obj = solverProcess.objective;
+            html += '<div style="margin-top: 15px; padding: 10px 12px; background: rgba(33, 150, 243, 0.1); border-radius: 4px; border-left: 3px solid #2196f3;">';
+            html += '<div style="font-weight: bold; color: #2196f3; margin-bottom: 8px;"><i class="layui-icon layui-icon-chart" style="margin-right: 4px;"></i>优化目标</div>';
+            html += '<div style="font-size: 12px;">';
+            html += '<div style="color: #10b981;">' + obj.formula + '</div>';
+            html += '<div style="color: var(--text-muted, #888); margin-left: 16px;">' + obj.formulaExplain + '</div>';
+            html += '<div style="color: #ff9800; margin-top: 6px; margin-left: 16px;">' + obj.note + '</div>';
+            html += '</div></div>';
+        }
+        
+        html += '</div>';
+        
+        $('#solver-process').html(html);
+    }
+    
+    // 初始化浮动导航交互
+    function initDetailNav() {
+        var $nav = $('#detail-nav');
+        var $wrapper = $('.detail-wrapper');
+        
+        // 存储各模块的绝对位置（只需计算一次）
+        var sectionPositions = {};
+        var scrollProgrammatic = false; // 标记是否为程序触发的滚动
+        
+        // 计算所有模块相对于容器的绝对位置
+        function calculatePositions() {
+            sectionPositions = {};
+            $wrapper.find('h4').each(function() {
+                var $section = $(this);
+                var targetDiv = $section.next('div');
+                if (targetDiv.length) {
+                    var targetId = targetDiv.attr('id');
+                    // 获取h4标题相对于wrapper原始位置的偏移
+                    sectionPositions[targetId] = $section[0].offsetTop;
+                }
+            });
+        }
+        
+        // 初始化时计算位置
+        calculatePositions();
+        
+        // 导航点击事件
+        $nav.find('a').on('click', function() {
+            var target = $(this).data('target');
+            
+            if (sectionPositions[target] !== undefined) {
+                scrollProgrammatic = true; // 标记为程序触发
+                
+                var targetPosition = sectionPositions[target];
+                
+                // 滚动到目标位置（目标模块在顶部稍微偏下）
+                var scrollTo = targetPosition - 10;
+                scrollTo = Math.max(0, scrollTo);
+                
+                $wrapper.stop().animate({
+                    scrollTop: scrollTo
+                }, 300, function() {
+                    // 动画完成后重置标记
+                    setTimeout(function() { scrollProgrammatic = false; }, 100);
+                });
+                
+                // 更新导航状态
+                $nav.find('a').removeClass('active');
+                $(this).addClass('active');
+            }
+        });
+        
+        // 滚动监听，更新导航高亮
+        $wrapper.on('scroll', function() {
+            // 如果是程序触发的滚动，不更新导航状态
+            if (scrollProgrammatic) return;
+            
+            var scrollTop = $wrapper.scrollTop();
+            var wrapperHeight = $wrapper.height();
+            var found = false;
+            
+            // 遍历所有模块位置，找到当前应该高亮的
+            var sortedSections = Object.keys(sectionPositions).map(function(id) {
+                return { id: id, pos: sectionPositions[id] };
+            }).sort(function(a, b) { return a.pos - b.pos; });
+            
+            for (var i = sortedSections.length - 1; i >= 0; i--) {
+                var section = sortedSections[i];
+                // 判断section是否进入视口（滚过了它的位置）
+                if (section.pos <= scrollTop + 80) {
+                    $nav.find('a').removeClass('active');
+                    $nav.find('a[data-target="' + section.id + '"]').addClass('active');
+                    found = true;
+                    break;
+                }
+            }
+            
+            // 如果没有找到，默认高亮第一个
+            if (!found && sortedSections.length > 0) {
+                $nav.find('a').removeClass('active');
+                $nav.find('a[data-target="' + sortedSections[0].id + '"]').addClass('active');
+            }
+        });
+    }
+
+    // 格式化 API 返回的 ISO 时间
+    function formatAPITime(isoStr) {
+        if (!isoStr) return '--';
+        try {
+            var d = new Date(isoStr);
+            var mm = (d.getMonth() + 1).toString().padStart(2, '0');
+            var dd = d.getDate().toString().padStart(2, '0');
+            var hh = d.getHours().toString().padStart(2, '0');
+            var mi = d.getMinutes().toString().padStart(2, '0');
+            return mm + '/' + dd + ' ' + hh + ':' + mi;
+        } catch(e) {
+            return isoStr;
+        }
+    }
+
+    // 根据后端返回的 input_snapshot 数据，在前端渲染求解过程
+    function buildSolverProcessFromSnapshot(inputSnapshot, suggestions) {
+        var zone = inputSnapshot.zone;
+        var V = inputSnapshot.tank_capacity;
+        var L = inputSnapshot.tank_level;
+        var T = inputSnapshot.schedule_interval_min / 60.0;
+        var C = inputSnapshot.process_capacity;
+        var safeRatio = inputSnapshot.safe_ratio;
+        var bufferRatio = inputSnapshot.process_buffer_ratio;
+        var minRateRatio = inputSnapshot.min_rate_ratio;
+        var elasticK = inputSnapshot.elastic_k;
+        // ALERT/EMERGENCY 区间后端不计算约束值，需 null 安全处理
+        var capacityLimit = inputSnapshot.capacity_limit;
+        var processLimit = inputSnapshot.process_limit;
+        var effectiveLimit = inputSnapshot.effective_limit;
+        var isSkipped = zone === 'ALERT' || zone === 'EMERGENCY';
+        var solverStatus = suggestions.length > 0 ? suggestions[0].solver_status : 'SKIPPED';
+        var rMax = suggestions.length > 0 ? Math.max.apply(null, suggestions.map(function(s) { return parseFloat(s.allowed_rate) || 0; })) : 12;
+        var elasticMaxRate = (zone === 'WARNING' && elasticK) ? rMax * elasticK : rMax;
+
+        var workshopStatusList = suggestions.map(function(s) {
+            var maxRate = parseFloat(s.allowed_rate) || 0;
+            var satisfied = zone !== 'ALERT' && zone !== 'EMERGENCY' ? maxRate >= 2 : true;
+            return { id: s.workshop_id, name: s.workshop_name, max_rate: maxRate.toFixed(2), min_rate: 2, allowed_rate: maxRate.toFixed(2), satisfied: satisfied };
+        });
+
+        var totalAllowedRate = suggestions.reduce(function(sum, s) { return sum + (parseFloat(s.allowed_rate) || 0); }, 0);
+        var avgRate = suggestions.length > 0 ? totalAllowedRate / suggestions.length : 0;
+        var actualSum = totalAllowedRate.toFixed(2);
+
+        var solverProcess = {
+            status: solverStatus,
+            constraints: [
+                { name: '储罐容量约束', order: '约束1', satisfied: isSkipped ? false : totalAllowedRate <= capacityLimit, value: isSkipped ? '求解已跳过（告警/紧急区间）' : 'Σr_i ≤ ' + capacityLimit.toFixed(2) + ' m³/h', formula: 'L + Σ(r_i × T) - C × T ≤ V × SAFE_RATIO', formulaExplain: 'L=当前液位, r_i=车间速率, T=调度周期, C=处理能力, V=储罐容量, SAFE_RATIO=安全系数', equivalent: isSkipped ? null : '等价形式：Σr_i ≤ (V × SAFE_RATIO - L) / T + C', calcVars: isSkipped ? null : { V: V, SAFE_RATIO: safeRatio, L: Math.round(L), T: T, C: C, capacityLimit: capacityLimit.toFixed(2) }, riCalc: isSkipped ? null : { totalRate: totalAllowedRate.toFixed(2), workshopCount: suggestions.length, avgRate: avgRate.toFixed(2), workshops: suggestions.map(function(s) { return { name: s.workshop_name, rate: parseFloat(s.allowed_rate).toFixed(2) }; }), actualSum: actualSum, constraintLimit: capacityLimit.toFixed(2), satisfied: totalAllowedRate <= capacityLimit } },
+                { name: '处理能力约束', order: '约束2', satisfied: true, value: isSkipped ? '求解已跳过' : 'Σr_i ≤ ' + processLimit.toFixed(2) + ' m³/h', formula: 'Σr_i ≤ C × PROCESS_BUFFER_RATIO', formulaExplain: 'C=处理能力, PROCESS_BUFFER_RATIO=缓冲系数', calcVars: isSkipped ? null : { C: C, PROCESS_BUFFER_RATIO: bufferRatio } },
+                { name: '单车间速率上限约束', order: '约束3', satisfied: true, value: isSkipped ? '求解已跳过' : 'r_i ≤ ' + elasticMaxRate.toFixed(2) + ' m³/h', formula: 'r_i ≤ r_max × k', formulaExplain: 'r_max=车间最大速率, k=弹性系数(正常=1.0, 预警区间按公式计算)', calcVars: isSkipped ? null : { r_max: rMax, k: (zone === 'WARNING' && elasticK) ? elasticK.toFixed(4) : '1.0' }, workshopStatus: isSkipped ? null : workshopStatusList },
+                { name: '单车间最小速率约束', order: '约束4', satisfied: zone === 'NORMAL', value: zone === 'NORMAL' ? 'r_i ≥ 2 m³/h (满足)' : (zone === 'WARNING' ? 'r_i ≥ 2 m³/h (部分压缩)' : '告警/紧急区间跳过此约束'), formula: 'r_i ≥ r_min', formulaExplain: 'r_min=车间最小速率(管道最低流量要求)', calcVars: { r_min: 2 }, workshopStatus: isSkipped ? null : workshopStatusList }
+            ],
+            elasticFormula: { formula: 'k = 1 - (L - 0.8V) / (0.1V) × (1 - MIN_RATE_RATIO)', formulaExplain: 'L=当前液位, V=储罐容量, MIN_RATE_RATIO=最低保留比例(默认0.3)', calcProcess: zone === 'WARNING' ? 'k = 1 - (' + Math.round(L) + ' - ' + (V * inputSnapshot.warning_ratio) + ') / (' + (V * 0.1) + ') × (1 - ' + minRateRatio + ') = ' + (elasticK ? elasticK.toFixed(4) : '-') : (zone === 'NORMAL' ? '正常区间：k = 1.0（无压缩）' : (zone === 'ALERT' ? '告警区间：k = 0（建议停排）' : '紧急区间：k = 0（建议紧急停排）')), result: zone === 'WARNING' && elasticK ? elasticK.toFixed(4) : (zone === 'NORMAL' ? '1.0' : '0'), zone: zone },
+            objective: { formula: 'Maximize: Σ(w_i × r_i)', formulaExplain: 'w_i=车间优先级权重, r_i=车间建议速率', note: 'MVP阶段各车间权重统一为1.0，目标退化为最大化总排放速率' }
+        };
+        return solverProcess;
+    }
+
+    // 渲染图表
+    var chart = echarts.init(document.getElementById('history-chart'));
+    
+    // 加载趋势数据（支持时间范围参数）
+    function loadTrendData(params) {
+        params = params || {};
+        window.API.getHistoryTrend(params).done(function(resp) {
+            if (resp.status !== 200 || !resp.data) {
+                console.error('获取趋势数据失败:', resp.message);
+                return;
+            }
+            renderTrendChart(chart, resp.data);
+        }).fail(function() {
+            console.error('获取趋势数据请求失败');
+        });
+    }
+
+    // 初始加载
+    loadTrendData();
+
+    // 主题切换处理
+    window.onThemeChange = function(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        
+        let textColor = theme === 'dark' ? '#e0e0e0' : '#333';
+        let splitLineColor = theme === 'dark' ? '#333' : '#ccc';
+        let primaryColor = theme === 'dark' ? '#2ADB5C' : '#10b981';
+
+        chart.setOption({
+            legend: { textStyle: { color: textColor } },
+            xAxis: { axisLabel: { color: textColor }, axisLine: { lineStyle: { color: splitLineColor } } },
+            yAxis: { nameTextStyle: { color: textColor }, axisLabel: { color: textColor }, splitLine: { lineStyle: { color: splitLineColor } } },
+            series: [
+                { 
+                    name: '实际液位', 
+                    itemStyle: { color: primaryColor },
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: theme === 'dark' ? 'rgba(42, 219, 92, 0.3)' : 'rgba(16, 185, 129, 0.3)' },
+                            { offset: 1, color: theme === 'dark' ? 'rgba(42, 219, 92, 0.1)' : 'rgba(16, 185, 129, 0.1)' }
+                        ])
+                    }
+                }
+            ]
+        });
+    };
+
+    let currentTheme = localStorage.getItem('theme') || 'light';
+    if(currentTheme === 'dark') {
+        window.onThemeChange('dark');
+        document.documentElement.setAttribute('data-theme', 'dark');
+    }
+
+    window.addEventListener('resize', function() {
+        chart.resize();
+    });
+    
+    // 初始化自定义悬浮提示
+    (function initCustomTooltip() {
+        // 创建悬浮提示元素
+        if ($('#custom-tooltip').length === 0) {
+            $('body').append('<div id="custom-tooltip" class="custom-tooltip"></div>');
+        }
+        var $tooltip = $('#custom-tooltip');
+        
+        // 委托事件处理告警消息悬浮
+        $(document).on('mouseenter', '.alert-msg-hover', function(e) {
+            var fullMsg = $(this).data('fullmsg');
+            $tooltip.text(fullMsg).addClass('show');
+            updateTooltipPosition(e);
+        }).on('mousemove', '.alert-msg-hover', function(e) {
+            updateTooltipPosition(e);
+        }).on('mouseleave', '.alert-msg-hover', function() {
+            $tooltip.removeClass('show');
+        });
+        
+        function updateTooltipPosition(e) {
+            var x = e.clientX + 15;
+            var y = e.clientY + 10;
+            // 防止超出屏幕
+            var tooltipWidth = $tooltip.outerWidth();
+            var tooltipHeight = $tooltip.outerHeight();
+            var windowWidth = $(window).width();
+            var windowHeight = $(window).height();
+            
+            if (x + tooltipWidth > windowWidth) {
+                x = e.clientX - tooltipWidth - 10;
+            }
+            if (y + tooltipHeight > windowHeight) {
+                y = e.clientY - tooltipHeight - 10;
+            }
+            
+            $tooltip.css({ left: x + 'px', top: y + 'px' });
+        }
+    })();
+});
+</script>
+</body>
+</html>

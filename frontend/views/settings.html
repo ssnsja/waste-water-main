@@ -1,0 +1,256 @@
+<!-- frontend/views/settings.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>系统配置</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="stylesheet" href="../static/lib/layui/css/layui.css">
+  <link rel="stylesheet" href="../static/css/style.css">
+  <style>
+    /* label 不换行，宽度由 JS 动态设置为最长文字宽度 */
+    .config-form.layui-form-pane .layui-form-label {
+      white-space: nowrap;
+      overflow: visible;
+    }
+  </style>
+  <script>
+    // 阻塞式渲染前同步主题，防止白屏闪烁
+    if(localStorage.getItem('theme') === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  </script>
+</head>
+<body>
+<div class="layui-fluid" style="padding: 15px;">
+  <div class="layui-card">
+    <div class="layui-card-header">系统运行参数配置</div>
+    <div class="layui-card-body">
+      <blockquote class="layui-elem-quote layui-text">
+        说明：修改以下参数将影响调度计算逻辑，保存后将同步至数据库 <code>WW_SYSTEM_CONFIG</code> 表。
+      </blockquote>
+      <form class="layui-form layui-form-pane config-form" action="" lay-filter="config-form">
+
+        <!-- 按钮组：靠左对齐放在表单顶部 -->
+        <div class="layui-form-item" style="margin-bottom: 15px;">
+          <button class="layui-btn" lay-submit lay-filter="save-settings">保存配置</button>
+          <button type="reset" class="layui-btn layui-btn-primary" id="btn-reset">重置</button>
+          <button type="button" class="layui-btn layui-btn-warm" id="btn-restart-scheduler" style="display: none;">重启调度器</button>
+        </div>
+
+        <div class="layui-form-item">
+          <label class="layui-form-label">储罐容量(V)</label>
+          <div class="layui-input-inline">
+            <input type="number" name="v" value="500" required lay-verify="required|number" placeholder="m³" autocomplete="off" class="layui-input">
+          </div>
+          <div class="layui-form-mid layui-word-aux">单位：m³ (TANK_CAPACITY)</div>
+        </div>
+
+        <div class="layui-form-item">
+          <label class="layui-form-label">处理能力(C)</label>
+          <div class="layui-input-inline">
+            <input type="number" name="c" value="60" required lay-verify="required|number" placeholder="m³/h" autocomplete="off" class="layui-input">
+          </div>
+          <div class="layui-form-mid layui-word-aux">单位：m³/h (PROCESS_CAPACITY)</div>
+        </div>
+
+        <div class="layui-form-item">
+          <label class="layui-form-label">调度周期(T)</label>
+          <div class="layui-input-inline">
+            <input type="number" name="t" value="30" required lay-verify="required|number" placeholder="分钟" autocomplete="off" class="layui-input">
+          </div>
+          <div class="layui-form-mid layui-word-aux">单位：分钟 (SCHEDULE_INTERVAL_MIN)</div>
+        </div>
+
+        <div class="layui-form-item">
+          <label class="layui-form-label">液位超期阈值</label>
+          <div class="layui-input-inline">
+            <input type="number" name="stale_threshold" value="2" required lay-verify="required|number" placeholder="调度周期倍数" autocomplete="off" class="layui-input">
+          </div>
+          <div class="layui-form-mid layui-word-aux">默认2，表示液位记录超过2个调度周期视为超期 (MANUAL_LEVEL_STALE_THRESHOLD)</div>
+        </div>
+
+        <div class="layui-form-item">
+          <label class="layui-form-label">安全容量系数</label>
+          <div class="layui-input-inline">
+            <input type="number" step="0.01" name="safe_ratio" value="0.85" required lay-verify="required|number" placeholder="比例" autocomplete="off" class="layui-input">
+          </div>
+          <div class="layui-form-mid layui-word-aux">预测液位不超过 V×SAFE_RATIO，默认0.85 (SAFE_RATIO)</div>
+        </div>
+
+        <div class="layui-form-item">
+          <label class="layui-form-label">预警阈值</label>
+          <div class="layui-input-inline">
+            <input type="number" step="0.01" name="w" value="0.80" required lay-verify="required|number" placeholder="比例" autocomplete="off" class="layui-input">
+          </div>
+          <div class="layui-form-mid layui-word-aux">液位 ≥ 此比例×V 进入预警区间，启用弹性压缩 (WARNING_RATIO)</div>
+        </div>
+
+        <div class="layui-form-item">
+          <label class="layui-form-label">告警阈值</label>
+          <div class="layui-input-inline">
+            <input type="number" step="0.01" name="a" value="0.90" required lay-verify="required|number" placeholder="比例" autocomplete="off" class="layui-input">
+          </div>
+          <div class="layui-form-mid layui-word-aux">液位 ≥ 此比例×V 进入告警区间，建议全部停排 (ALERT_RATIO)</div>
+        </div>
+
+        <div class="layui-form-item">
+          <label class="layui-form-label">紧急阈值</label>
+          <div class="layui-input-inline">
+            <input type="number" step="0.01" name="e" value="0.95" required lay-verify="required|number" placeholder="比例" autocomplete="off" class="layui-input">
+          </div>
+          <div class="layui-form-mid layui-word-aux">液位 ≥ 此比例×V 进入紧急区间，建议立即停排并人工介入 (EMERGENCY_RATIO)</div>
+        </div>
+
+        <div class="layui-form-item">
+          <label class="layui-form-label">弹性压缩最低保留比例</label>
+          <div class="layui-input-inline">
+            <input type="number" step="0.01" name="m" value="0.30" required lay-verify="required|number" placeholder="比例" autocomplete="off" class="layui-input">
+          </div>
+          <div class="layui-form-mid layui-word-aux">预警区间末端最低保留的速率比例，设为0则完全停排 (MIN_RATE_RATIO)</div>
+        </div>
+
+        <div class="layui-form-item">
+          <label class="layui-form-label">处理能力缓冲系数</label>
+          <div class="layui-input-inline">
+            <input type="number" step="0.01" name="buffer_ratio" value="1.20" required lay-verify="required|number" placeholder="比例" autocomplete="off" class="layui-input">
+          </div>
+          <div class="layui-form-mid layui-word-aux">总排放速率 ≤ C×此系数，允许储罐小量积液，默认1.20 (PROCESS_BUFFER_RATIO)</div>
+        </div>
+
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="../static/lib/jquery-1.8.3.min.js"></script>
+<script src="../static/lib/layui/layui.js"></script>
+<script src="../static/js/api.js"></script>
+<script>
+$(function() {
+    // ===== label 等宽自适应：测量最宽 label，统一所有 label =====
+    (function alignLabels() {
+        var $labels = $('.config-form .layui-form-label');
+        var maxW = 0;
+        $labels.css('width', 'auto');
+        $labels.each(function() {
+            var w = $(this).outerWidth();
+            if (w > maxW) maxW = w;
+        });
+        $labels.css('width', maxW + 'px');
+        $('.config-form .layui-input-block').css('margin-left', maxW + 'px');
+    })();
+
+    // 处理主题切换
+    window.onThemeChange = function(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+    };
+
+    var currentTheme = localStorage.getItem('theme') || 'light';
+    if(currentTheme === 'dark') {
+        window.onThemeChange('dark');
+        document.documentElement.setAttribute('data-theme', 'dark');
+    }
+
+    layui.use(['form', 'layer'], function(){
+        var form = layui.form;
+        var layer = layui.layer;
+
+        // 从 API 加载配置并填充表单
+        function loadConfig() {
+            window.API.getConfig().done(function(resp) {
+                if (resp.status !== 200 || !resp.data) {
+                    layer.msg('加载配置失败: ' + (resp.message || '未知错误'));
+                    return;
+                }
+                var cfg = resp.data;
+                $('input[name="v"]').val(cfg.tank_capacity);
+                $('input[name="c"]').val(cfg.process_capacity);
+                $('input[name="t"]').val(cfg.schedule_interval_min);
+                $('input[name="stale_threshold"]').val(cfg.manual_level_stale_threshold);
+                $('input[name="safe_ratio"]').val(cfg.safe_ratio);
+                $('input[name="w"]').val(cfg.warning_ratio);
+                $('input[name="a"]').val(cfg.alert_ratio);
+                $('input[name="e"]').val(cfg.emergency_ratio);
+                $('input[name="m"]').val(cfg.min_rate_ratio);
+                $('input[name="buffer_ratio"]').val(cfg.process_buffer_ratio);
+                form.render();
+            }).fail(function() {
+                layer.msg('加载配置请求失败，请检查网络连接');
+            });
+        }
+
+        loadConfig();
+
+        // 保存配置
+        form.on('submit(save-settings)', function(data){
+            var formData = data.field;
+            var apiData = {
+                tank_capacity: parseFloat(formData.v),
+                process_capacity: parseFloat(formData.c),
+                schedule_interval_min: parseInt(formData.t),
+                manual_level_stale_threshold: parseInt(formData.stale_threshold),
+                safe_ratio: parseFloat(formData.safe_ratio),
+                warning_ratio: parseFloat(formData.w),
+                alert_ratio: parseFloat(formData.a),
+                emergency_ratio: parseFloat(formData.e),
+                min_rate_ratio: parseFloat(formData.m),
+                process_buffer_ratio: parseFloat(formData.buffer_ratio)
+            };
+
+            window.API.updateConfig(apiData).done(function(resp) {
+                if (resp.status === 200) {
+                    layer.msg(resp.message || '配置保存成功');
+                    if (resp.data && resp.data.need_restart) {
+                        // 显示重启调度器按钮
+                        $('#btn-restart-scheduler').show();
+                        layer.confirm('调度周期已变更，需要重启调度器使新配置生效。是否立即重启？', {
+                            btn: ['立即重启', '稍后手动重启']
+                        }, function(confirmIndex) {
+                            restartScheduler();
+                            layer.close(confirmIndex);
+                        });
+                    }
+                } else {
+                    layer.msg('配置保存失败: ' + resp.message);
+                }
+            }).fail(function() {
+                layer.msg('配置保存请求失败，请检查网络连接');
+            });
+
+            return false;
+        });
+
+        // 重启调度器
+        function restartScheduler() {
+            window.API.restartScheduler().done(function(resp) {
+                if (resp.status === 200) {
+                    layer.msg('调度器已重启，新配置已生效');
+                    $('#btn-restart-scheduler').hide();
+                } else {
+                    layer.msg('重启调度器失败: ' + resp.message);
+                }
+            }).fail(function() {
+                layer.msg('重启调度器请求失败');
+            });
+        }
+
+        // 重启调度器按钮
+        $('#btn-restart-scheduler').click(function(){
+            layer.confirm('确认重启调度器？重启期间将暂停调度。', function(confirmIndex) {
+                restartScheduler();
+                layer.close(confirmIndex);
+            });
+        });
+
+        // 重置按钮 - 重新从 API 加载配置
+        $('#btn-reset').click(function(){
+            setTimeout(function() {
+                loadConfig();
+            }, 100);
+        });
+    });
+});
+</script>
+</body>
+</html>

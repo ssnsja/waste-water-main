@@ -1,0 +1,66 @@
+# IDE
+.idea/
+
+# Qoder
+.qoder/
+
+# Logs
+logs/
+backend/logs/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv/
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite3
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# frontend
+!frontend/static/lib/
+!frontend/static/lib/**/*
+
+# gemini
+GEMINI.md
+
+
+

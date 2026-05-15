@@ -1,0 +1,294 @@
+<!-- frontend/views/workshops.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>车间管理</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="stylesheet" href="../static/lib/layui/css/layui.css">
+  <link rel="stylesheet" href="../static/css/style.css">
+  <script>
+    if(localStorage.getItem('theme') === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  </script>
+</head>
+<body>
+<div class="layui-fluid" style="padding: 15px;">
+  <div class="layui-card">
+    <div class="layui-card-header">车间基础信息管理</div>
+    <div class="layui-card-body">
+      <!-- 表格上方工具栏 -->
+      <div class="layui-row" style="margin-bottom: 15px;">
+        <div class="layui-col-md6">
+          <button class="layui-btn" id="btn-add-workshop">
+            <i class="layui-icon layui-icon-add-1"></i> 新增车间
+          </button>
+          <button class="layui-btn layui-btn-primary" id="btn-refresh">
+            <i class="layui-icon layui-icon-refresh"></i> 刷新
+          </button>
+        </div>
+        <div class="layui-col-md6" style="text-align: right;">
+          <button class="layui-btn" id="btn-batch-update">
+            <i class="layui-icon layui-icon-release"></i> 批量更新
+          </button>
+          <button class="layui-btn layui-btn-danger" id="btn-batch-delete">
+            <i class="layui-icon layui-icon-delete"></i> 批量删除
+          </button>
+        </div>
+      </div>
+      
+      <table id="workshop-table" lay-filter="workshop-table"></table>
+    </div>
+  </div>
+</div>
+
+<!-- 新增/编辑车间 隐藏表单模板 -->
+<div id="workshop-form-tpl" style="display: none; padding: 20px;">
+  <form class="layui-form layui-form-pane" lay-filter="workshop-form">
+    <div class="layui-form-item">
+      <label class="layui-form-label">车间编号</label>
+      <div class="layui-input-block">
+        <input type="text" name="workshop_id" required lay-verify="required" placeholder="如: WS001" class="layui-input">
+      </div>
+    </div>
+    <div class="layui-form-item">
+      <label class="layui-form-label">车间名称</label>
+      <div class="layui-input-block">
+        <input type="text" name="workshop_name" required lay-verify="required" placeholder="请输入车间名称" class="layui-input">
+      </div>
+    </div>
+    <div class="layui-form-item">
+      <div class="layui-inline">
+        <label class="layui-form-label">最大速率</label>
+        <div class="layui-input-inline">
+          <input type="number" name="max_rate" step="0.1" required lay-verify="required|number" class="layui-input">
+        </div>
+      </div>
+      <div class="layui-inline">
+        <label class="layui-form-label">最小速率</label>
+        <div class="layui-input-inline">
+          <input type="number" name="min_rate" step="0.1" required lay-verify="required|number" class="layui-input">
+        </div>
+      </div>
+    </div>
+    <div class="layui-form-item">
+      <div class="layui-inline">
+        <label class="layui-form-label">优先级权重</label>
+        <div class="layui-input-inline">
+          <input type="number" name="weight" step="0.1" value="1.0" required lay-verify="required|number" class="layui-input">
+        </div>
+      </div>
+      <div class="layui-inline">
+        <label class="layui-form-label">启用状态</label>
+        <div class="layui-input-inline">
+          <input type="checkbox" name="is_active" lay-skin="switch" lay-text="启用|停用" checked>
+        </div>
+      </div>
+    </div>
+    <div class="layui-form-item layui-form-text">
+      <label class="layui-form-label">备注说明</label>
+      <div class="layui-input-block">
+        <textarea name="remark" placeholder="请输入备注内容" class="layui-textarea"></textarea>
+      </div>
+    </div>
+  </form>
+</div>
+
+<!-- 行操作按钮模板 -->
+<script type="text/html" id="rowToolbar">
+  <a class="layui-btn layui-btn-xs layui-btn-primary" lay-event="save">更新</a>
+  <a class="layui-btn layui-btn-xs layui-btn-danger" lay-event="del">删除</a>
+</script>
+
+<script src="../static/lib/jquery-1.8.3.min.js"></script>
+<script src="../static/lib/layui/layui.js"></script>
+<script src="../static/js/api.js"></script>
+<script>
+$(function() {
+    window.onThemeChange = function(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+    };
+
+    layui.use(['table', 'form', 'layer'], function(){
+        var table = layui.table;
+        var form = layui.form;
+        var layer = layui.layer;
+
+        // 加载车间列表
+        function loadWorkshops() {
+            window.API.getWorkshops().done(function(resp) {
+                if (resp.status !== 200) {
+                    layer.msg('加载车间列表失败: ' + resp.message);
+                    return;
+                }
+                var list = resp.data || [];
+                table.render({
+                    elem: '#workshop-table',
+                    data: list,
+                    page: true,
+                    limit: 10,
+                    cols: [[
+                        {type: 'checkbox', fixed: 'left'},
+                        {field: 'workshop_id', title: '车间编号', width: 120, sort: true},
+                        {field: 'workshop_name', title: '车间名称', width: 180, edit: 'text'},
+                        {field: 'max_discharge_rate', title: '最大速率', width: 110, edit: 'text', align: 'right'},
+                        {field: 'min_discharge_rate', title: '最小速率', width: 110, edit: 'text', align: 'right'},
+                        {field: 'priority_weight', title: '权重', width: 90, edit: 'text', align: 'right'},
+                        {field: 'is_active', title: '启用状态', width: 100, templet: function(d){
+                            var checked = d.is_active == 1 ? 'checked' : '';
+                            return '<input type="checkbox" name="active" value="'+d.workshop_id+'" lay-skin="switch" lay-text="开启|关闭" lay-filter="active-switch" '+checked+'>';
+                        }},
+                        {field: 'remark', title: '备注', edit: 'text'},
+                        {title: '操作', width: 150, align: 'center', fixed: 'right', toolbar: '#rowToolbar'}
+                    ]]
+                });
+            }).fail(function() {
+                layer.msg('加载车间列表失败，请检查网络连接');
+            });
+        }
+
+        loadWorkshops();
+
+        // 监听行工具条
+        table.on('tool(workshop-table)', function(obj){
+            var data = obj.data;
+            if(obj.event === 'del'){
+                layer.confirm('确认删除该车间配置吗？', function(confirmIndex){
+                    window.API.deleteWorkshop(data.workshop_id).done(function(resp) {
+                        if (resp.status === 200) {
+                            layer.msg('车间已停用');
+                            obj.del();
+                        } else {
+                            layer.msg('删除失败: ' + resp.message);
+                        }
+                    }).fail(function() {
+                        layer.msg('删除请求失败');
+                    });
+                    layer.close(confirmIndex);
+                });
+            } else if(obj.event === 'save'){
+                var updateData = {
+                    workshop_name: data.workshop_name,
+                    max_discharge_rate: parseFloat(data.max_discharge_rate),
+                    min_discharge_rate: parseFloat(data.min_discharge_rate),
+                    priority_weight: parseFloat(data.priority_weight),
+                    remark: data.remark
+                };
+                window.API.updateWorkshop(data.workshop_id, updateData).done(function(resp) {
+                    if (resp.status === 200) {
+                        layer.msg('车间 ' + data.workshop_id + ' 信息已更新');
+                    } else {
+                        layer.msg('更新失败: ' + resp.message);
+                    }
+                }).fail(function() {
+                    layer.msg('更新请求失败');
+                });
+            }
+        });
+
+        // 状态开关监听
+        form.on('switch(active-switch)', function(obj){
+            var wsId = this.value;
+            var isActive = obj.elem.checked ? 1 : 0;
+            var statusText = obj.elem.checked ? '开启' : '关闭';
+            window.API.updateWorkshopStatus(wsId, isActive).done(function(resp) {
+                if (resp.status === 200) {
+                    layer.msg('车间 ' + wsId + ' 已' + statusText);
+                } else {
+                    layer.msg('状态更新失败: ' + resp.message);
+                    obj.elem.checked = !obj.elem.checked;
+                    form.render();
+                }
+            }).fail(function() {
+                layer.msg('状态更新请求失败');
+                obj.elem.checked = !obj.elem.checked;
+                form.render();
+            });
+        });
+
+        // 新增车间
+        $('#btn-add-workshop').click(function(){
+            layer.open({
+                type: 1,
+                title: '新增车间信息',
+                closeBtn: 1,
+                area: ['650px', 'auto'],
+                content: $('#workshop-form-tpl').html(),
+                btn: ['提交', '取消'],
+                yes: function(index, layero){
+                    var formData = {};
+                    $(layero).find('input,textarea').each(function(){
+                        var name = $(this).attr('name');
+                        if (!name) return;
+                        // checkbox 需读取 checked 属性而非 val()，val() 对 checkbox 始终返回 value 属性（默认 "on"）
+                        if ($(this).attr('type') === 'checkbox') {
+                            formData[name] = $(this).prop('checked') ? 'on' : '';
+                        } else {
+                            formData[name] = $(this).val();
+                        }
+                    });
+                    var apiData = {
+                        workshop_id: formData.workshop_id,
+                        workshop_name: formData.workshop_name,
+                        max_discharge_rate: parseFloat(formData.max_rate) || 0,
+                        min_discharge_rate: parseFloat(formData.min_rate) || 0,
+                        priority_weight: parseFloat(formData.weight) || 1.0,
+                        is_active: formData.is_active === 'on' ? 1 : 0,
+                        remark: formData.remark || ''
+                    };
+                    window.API.createWorkshop(apiData).done(function(resp) {
+                        if (resp.status === 201 || resp.status === 200) {
+                            layer.msg('车间新增成功');
+                            layer.close(index);
+                            loadWorkshops();
+                        } else {
+                            layer.msg('新增失败: ' + resp.message);
+                        }
+                    }).fail(function() {
+                        layer.msg('新增请求失败');
+                    });
+                },
+                success: function(){
+                    form.render();
+                }
+            });
+        });
+
+        // 批量更新
+        $('#btn-batch-update').click(function(){
+            var checkStatus = table.checkStatus('workshop-table');
+            var data = checkStatus.data;
+            if(data.length === 0) return layer.msg('请先勾选要更新的车间');
+            layer.msg('批量更新功能开发中，请使用行内编辑+更新按钮逐条操作');
+        });
+
+        // 批量删除
+        $('#btn-batch-delete').click(function(){
+            var checkStatus = table.checkStatus('workshop-table');
+            var data = checkStatus.data;
+            if(data.length === 0) return layer.msg('请先勾选要删除的车间');
+            layer.confirm('确认删除选中的 ' + data.length + ' 个车间吗？', function(confirmIndex){
+                var count = 0;
+                data.forEach(function(ws) {
+                    window.API.deleteWorkshop(ws.workshop_id).always(function() {
+                        count++;
+                        if (count === data.length) {
+                            layer.msg('批量删除完成');
+                            layer.close(confirmIndex);
+                            loadWorkshops();
+                        }
+                    });
+                });
+            });
+        });
+
+        // 刷新
+        $('#btn-refresh').click(function(){
+            loadWorkshops();
+        });
+    });
+});
+</script>
+</body>
+</html>
